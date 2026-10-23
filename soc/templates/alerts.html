@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Alerts{% endblock %}
+{% block content %}
+<h1>Alerts <span class="muted small">{{ total }} shown{% if total > 500 %} (first 500){% endif %}</span></h1>
+<form class="filters" method="get">
+  <input name="q" value="{{ q }}" placeholder="Search title, IP, host, user">
+  <select name="severity"><option value="">all severities</option>
+    {% for s in ['critical','high','medium','low'] %}<option {% if s == sev %}selected{% endif %}>{{ s }}</option>{% endfor %}</select>
+  <select name="source"><option value="">all sources</option>
+    {% for s in sources %}<option {% if s == src %}selected{% endif %}>{{ s }}</option>{% endfor %}</select>
+  <button class="ghost">Filter</button>
+</form>
+<section class="panel">
+  <table>
+    <thead><tr><th>Risk</th><th>Time</th><th>Source</th><th>Severity</th><th>Alert</th><th>Src → Dst</th><th>Host / user</th><th>ATT&amp;CK</th></tr></thead>
+    <tbody>{% for a in rows %}
+      <tr><td><span class="risk r{{ a.risk_score // 25 }}">{{ a.risk_score }}</span></td>
+        <td class="mono small">{{ a.timestamp.strftime('%d %b %H:%M:%S') }}</td><td>{{ a.source }}</td>
+        <td><span class="sev {{ a.severity }}">{{ a.severity }}</span></td><td>{{ a.title }}</td>
+        <td class="mono small">{{ a.src_ip or '-' }}{% if a.dest_ip %} → {{ a.dest_ip }}{% endif %}</td>
+        <td class="small">{{ a.host }}{% if a.user %} / {{ a.user }}{% endif %}</td>
+        <td class="mono small">{{ a.mitre_technique }}</td></tr>
+    {% else %}<tr><td colspan="8" class="muted">No alerts match.</td></tr>{% endfor %}</tbody>
+  </table>
+</section>
+{% endblock %}

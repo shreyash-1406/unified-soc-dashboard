@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+{% if not total %}
+<section class="empty">
+  <h1>No alerts yet</h1>
+  <p class="muted">Upload Wazuh, Suricata or Linux auth logs, or load the bundled sample scenario.</p>
+  <div class="row">
+    <form method="post" action="{{ url_for('demo') }}"><button class="primary">Load sample data</button></form>
+    <a class="btn" href="{{ url_for('ingest_form') }}">Upload logs</a>
+  </div>
+</section>
+{% else %}
+<div class="kpis">
+  <div class="kpi"><span>Alerts</span><b>{{ total }}</b></div>
+  <div class="kpi"><span>Open incidents</span><b>{{ open_inc|length }}</b></div>
+  <div class="kpi crit"><span>Critical</span><b>{{ open_inc|selectattr('severity', 'equalto', 'critical')|list|length }}</b><small>open incidents</small></div>
+  <div class="kpi high"><span>High</span><b>{{ open_inc|selectattr('severity', 'equalto', 'high')|list|length }}</b><small>open incidents</small></div>
+  <div class="kpi"><span>Noise reduction</span><b>{{ ((1 - (incidents|length) / total) * 100)|round|int }}%</b><small>{{ total }} alerts → {{ incidents|length }} incidents</small></div>
+</div>
+
+<div class="grid">
+  <section class="panel wide">
+    <h2>Alert timeline <span class="muted small">per 10 min</span></h2>
+    <div class="timeline">
+      {% for t, c in timeline %}
+      <div class="tcol" title="{{ t.strftime('%d %b %H:%M') }}: {{ c }} alerts">
+        <i style="height: {{ (c / peak * 100)|round|int }}%"></i>
+        {% if loop.index0 % 3 == 0 %}<span>{{ t.strftime('%H:%M') }}</span>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>By source</h2>
+    {% for s, c in by_source %}
+    <div class="bar"><span>{{ s }}</span><div><i style="width: {{ (c / total * 100)|round|int }}%"></i></div><b>{{ c }}</b></div>
+    {% endfor %}
+    <h2 class="mt">By severity</h2>
+    {% for s in ['critical', 'high', 'medium', 'low'] %}
+    <div class="bar sev-{{ s }}"><span>{{ s }}</span><div><i style="width: {{ ((by_sev[s] or 0) / total * 100)|round|int }}%"></i></div><b>{{ by_sev[s] or 0 }}</b></div>
+    {% endfor %}
+  </section>
+
+  <section class="panel">
+    <h2>MITRE ATT&amp;CK tactics</h2>
+    {% for t, c in by_tactic %}
+    <div class="bar tactic"><span>{{ t }}</span><div><i style="width: {{ (c / by_tactic[0][1] * 100)|round|int }}%"></i></div><b>{{ c }}</b></div>
+    {% else %}<p class="muted">No tactics mapped.</p>{% endfor %}
+  </section>
+</div>
+
+<section class="panel">
+  <div class="head-row">
+    <h2>Incident queue</h2>
+    <form method="post" action="{{ url_for('reset') }}" onsubmit="return confirm('Delete all alerts and notes?')">
+      <button class="link">reset data</button></form>
+  </div>
+  <table class="queue">
+    <thead><tr><th>Risk</th><th>Severity</th><th>Incident</th><th>Entity</th><th>Alerts</th><th>ATT&amp;CK</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for i in incidents %}
+      <tr class="{{ 'dim' if i.status in ('closed', 'false_positive') }}">
+        <td><span class="risk r{{ i.risk // 25 }}">{{ i.risk }}</span></td>
+        <td><span class="sev {{ i.severity }}">{{ i.severity }}</span></td>
+        <td><a href="{{ url_for('incident', iid=i.id) }}">{{ i.title }}</a><div class="muted small mono">{{ i.id }} · {{ i.first_seen[11:16] }}–{{ i.last_seen[11:16] }}</div></td>
+        <td class="mono">{{ i.entity.split(':', 1)[1] }}</td>
+        <td>{{ i.alert_count }}</td>
+        <td class="mono small">{{ i.techniques|join(', ') }}</td>
+        <td><span class="status {{ i.status }}">{{ i.status.replace('_', ' ') }}</span></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7" class="muted">No incidents: alerts did not correlate into anything worth investigating.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted small">Critical hosts (extra risk weight): {{ critical_hosts|join(', ') or 'none' }}</p>
+</section>
+{% endif %}
+{% endblock %}

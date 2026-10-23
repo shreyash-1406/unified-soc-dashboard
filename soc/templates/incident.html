@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ inc.id }} · {{ inc.title }}{% endblock %}
+{% block content %}
+<a href="{{ url_for('dashboard') }}" class="muted small">← incident queue</a>
+<div class="head-row">
+  <div>
+    <h1>{{ inc.title }}</h1>
+    <p class="muted mono">{{ inc.id }} · {{ inc.first_seen.replace('T', ' ')[:19] }} → {{ inc.last_seen[11:19] }}</p>
+  </div>
+  <div class="row">
+    <span class="risk big r{{ inc.risk // 25 }}">{{ inc.risk }}</span>
+    <span class="sev {{ inc.severity }}">{{ inc.severity }}</span>
+  </div>
+</div>
+
+<div class="grid">
+  <section class="panel wide">
+    <h2>Triage note <span class="tag">{{ 'AI' if inc.summary_source == 'ai' else 'rule-based' }}</span></h2>
+    <p class="pre">{{ inc.summary }}</p>
+    {% if ai_on %}
+    <form method="post" action="{{ url_for('triage', iid=inc.id) }}"><button class="ghost">Ask AI for a triage note</button></form>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <h2>Correlation findings</h2>
+    {% for p in inc.patterns %}<div class="pattern"><b>{{ p.name }}</b><p>{{ p.detail }}</p></div>
+    {% else %}<p class="muted">No multi-alert pattern; grouped by entity and time.</p>{% endfor %}
+  </section>
+
+  <section class="panel">
+    <h2>Context</h2>
+    <dl>
+      <dt>Entity</dt><dd class="mono">{{ inc.entity }}</dd>
+      <dt>Hosts</dt><dd>{{ inc.hosts|join(', ') or '-' }}</dd>
+      <dt>Users</dt><dd>{{ inc.users|join(', ') or '-' }}</dd>
+      <dt>Sources</dt><dd>{{ inc.sources|join(', ') }}</dd>
+      <dt>ATT&amp;CK</dt><dd>{% for t in inc.techniques %}<a class="mono" href="https://attack.mitre.org/techniques/{{ t.replace('.', '/') }}/" target="_blank" rel="noopener">{{ t }}</a> {% endfor %}
+        <div class="muted small">{{ inc.tactics|join(' · ') }}</div></dd>
+    </dl>
+  </section>
+
+  <section class="panel">
+    <h2>Analyst decision</h2>
+    <form method="post" action="{{ url_for('update_incident', iid=inc.id) }}" class="stack">
+      <label>Status
+        <select name="status">{% for s in statuses %}<option value="{{ s }}" {% if s == inc.status %}selected{% endif %}>{{ s.replace('_', ' ') }}</option>{% endfor %}</select></label>
+      <label>Notes
+        <textarea name="note" rows="4" placeholder="What you checked, who you contacted, actions taken">{{ inc.note }}</textarea></label>
+      <button class="primary">Save</button>
+    </form>
+  </section>
+</div>
+
+<section class="panel">
+  <h2>Alerts ({{ alerts|length }})</h2>
+  <table>
+    <thead><tr><th>Time</th><th>Source</th><th>Severity</th><th>Alert</th><th>Src → Dst</th><th>Host / user</th><th>Risk</th></tr></thead>
+    <tbody>{% for a in alerts %}
+      <tr><td class="mono small">{{ a.timestamp.strftime('%H:%M:%S') }}</td><td>{{ a.source }}</td>
+        <td><span class="sev {{ a.severity }}">{{ a.severity }}</span></td><td>{{ a.title }}</td>
+        <td class="mono small">{{ a.src_ip or '-' }}{% if a.dest_ip %} → {{ a.dest_ip }}{% endif %}</td>
+        <td class="small">{{ a.host }}{% if a.user %} / {{ a.user }}{% endif %}</td><td>{{ a.risk_score }}</td></tr>
+    {% endfor %}</tbody>
+  </table>
+</section>
+{% endblock %}
